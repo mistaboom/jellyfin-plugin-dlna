@@ -193,6 +193,7 @@ public class DidlBuilder
     /// <param name="filter">The <see cref="Filter"/>.</param>
     /// <param name="streamInfo">The <see cref="StreamInfo" />.</param>
     /// <param name="contextIdSuffix">The parent virtual-folder ID suffix.</param>
+    /// <param name="contextAncestorId">The library scope encoded in the parent object ID.</param>
     /// </summary>
     public void WriteItemElement(
         XmlWriter writer,
@@ -203,7 +204,8 @@ public class DidlBuilder
         string deviceId,
         Filter filter,
         StreamInfo? streamInfo = null,
-        string? contextIdSuffix = null
+        string? contextIdSuffix = null,
+        Guid? contextAncestorId = null
     )
     {
         var clientId = GetClientId(item, null);
@@ -217,7 +219,7 @@ public class DidlBuilder
         {
             writer.WriteAttributeString(
                 "parentID",
-                GetClientId(context, contextStubType, contextIdSuffix)
+                GetClientId(context, contextStubType, contextIdSuffix, contextAncestorId)
             );
         }
         else
@@ -253,6 +255,27 @@ public class DidlBuilder
         writer.WriteFullEndElement();
     }
 
+    /// <summary>
+    /// Builds the profile-specific playback plan for a video item.
+    /// </summary>
+    /// <param name="video">The video item.</param>
+    /// <param name="deviceId">The DLNA device id.</param>
+    /// <returns>The optimal stream information, or <see langword="null"/> when no stream can be built.</returns>
+    public StreamInfo? GetOptimalVideoStream(BaseItem video, string deviceId)
+    {
+        var sources = _mediaSourceManager.GetStaticMediaSources(video, true, _user);
+        return new StreamBuilder(_mediaEncoder, _logger).GetOptimalVideoStream(
+            new MediaOptions
+            {
+                ItemId = video.Id,
+                MediaSources = sources.ToArray(),
+                Profile = _profile,
+                DeviceId = deviceId,
+                MaxBitrate = _profile.MaxStreamingBitrate,
+            }
+        );
+    }
+
     private void AddVideoResource(
         XmlWriter writer,
         BaseItem video,
@@ -261,22 +284,8 @@ public class DidlBuilder
         StreamInfo? streamInfo = null
     )
     {
-        if (streamInfo is null)
-        {
-            var sources = _mediaSourceManager.GetStaticMediaSources(video, true, _user);
-
-            streamInfo =
-                new StreamBuilder(_mediaEncoder, _logger).GetOptimalVideoStream(
-                    new MediaOptions
-                    {
-                        ItemId = video.Id,
-                        MediaSources = sources.ToArray(),
-                        Profile = _profile,
-                        DeviceId = deviceId,
-                        MaxBitrate = _profile.MaxStreamingBitrate,
-                    }
-                ) ?? throw new InvalidOperationException("No optimal video stream found");
-        }
+        streamInfo ??= GetOptimalVideoStream(video, deviceId)
+            ?? throw new InvalidOperationException("No optimal video stream found");
 
         var targetWidth = streamInfo.TargetWidth;
         var targetHeight = streamInfo.TargetHeight;
@@ -574,8 +583,16 @@ public class DidlBuilder
                     return _localization.GetLocalizedString("HeaderFavoriteEpisodes");
                 case StubType.Series:
                     return _localization.GetLocalizedString("Shows");
+                case StubType.All:
+                    return "All";
+                case StubType.VideoLatest:
+                    return "Latest";
+                case StubType.VideoGenres:
+                    return "Genres";
                 case StubType.MovieLetter:
                 case StubType.SeriesLetter:
+                case StubType.MovieGenre:
+                case StubType.SeriesGenre:
                     return item.Name;
             }
         }
@@ -825,6 +842,7 @@ public class DidlBuilder
     /// <param name="idSuffix">The suffix encoded in this folder's object ID.</param>
     /// <param name="contextStubType">The parent virtual-folder type.</param>
     /// <param name="contextIdSuffix">The parent virtual-folder ID suffix.</param>
+    /// <param name="ancestorId">The library scope encoded in this folder's object ID.</param>
     /// </summary>
     public void WriteFolderElement(
         XmlWriter writer,
@@ -837,7 +855,8 @@ public class DidlBuilder
         string? virtualFolderName = null,
         string? idSuffix = null,
         StubType? contextStubType = null,
-        string? contextIdSuffix = null
+        string? contextIdSuffix = null,
+        Guid? ancestorId = null
     )
     {
         writer.WriteStartElement(string.Empty, "container", NsDidl);
@@ -849,7 +868,7 @@ public class DidlBuilder
             childCount.ToString(CultureInfo.InvariantCulture)
         );
 
-        var clientId = GetClientId(folder, stubType, idSuffix);
+        var clientId = GetClientId(folder, stubType, idSuffix, ancestorId);
 
         if (string.Equals(requestedId, "0", StringComparison.Ordinal))
         {
@@ -1018,7 +1037,16 @@ public class DidlBuilder
             }
         }
 
-        AddPeople(item, writer);
+        // Cast/crew is not required for navigation or playback, and the lookup is
+        // expensive when a Samsung/LG client opens a page of movies or series.
+        // Keep the richer metadata for non-video library types only.
+        if (item.MediaType != MediaType.Video
+            && item is not Series
+            && item is not Season
+            && item is not BoxSet)
+        {
+            AddPeople(item, writer);
+        }
     }
 
     private void WriteObjectClass(XmlWriter writer, BaseItem item, StubType? stubType)
@@ -1243,6 +1271,20 @@ public class DidlBuilder
 
     private void AddCover(BaseItem item, StubType? stubType, XmlWriter writer)
     {
+        // Synthetic navigation folders intentionally stay lightweight. Reusing the
+        // library's artwork for every letter/genre creates a large DIDL response
+        // and prompts some TVs to fetch the same image dozens of times.
+        if (stubType is StubType.All
+            or StubType.VideoLatest
+            or StubType.VideoGenres
+            or StubType.MovieLetter
+            or StubType.SeriesLetter
+            or StubType.MovieGenre
+            or StubType.SeriesGenre)
+        {
+            return;
+        }
+
         ImageDownloadInfo? imageInfo = GetImageInfo(item);
 
         if (imageInfo is null)
@@ -1289,18 +1331,18 @@ public class DidlBuilder
 
         if (!_profile.EnableSingleAlbumArtLimit || item.MediaType == MediaType.Photo)
         {
-            AddImageResElement(item, writer, 4096, 4096, "jpg", "JPEG_LRG");
-            AddImageResElement(item, writer, 1024, 768, "jpg", "JPEG_MED");
-            AddImageResElement(item, writer, 640, 480, "jpg", "JPEG_SM");
-            AddImageResElement(item, writer, 4096, 4096, "png", "PNG_LRG");
-            AddImageResElement(item, writer, 160, 160, "png", "PNG_TN");
+            AddImageResElement(imageInfo, writer, 4096, 4096, "jpg", "JPEG_LRG");
+            AddImageResElement(imageInfo, writer, 1024, 768, "jpg", "JPEG_MED");
+            AddImageResElement(imageInfo, writer, 640, 480, "jpg", "JPEG_SM");
+            AddImageResElement(imageInfo, writer, 4096, 4096, "png", "PNG_LRG");
+            AddImageResElement(imageInfo, writer, 160, 160, "png", "PNG_TN");
         }
 
-        AddImageResElement(item, writer, 160, 160, "jpg", "JPEG_TN");
+        AddImageResElement(imageInfo, writer, 160, 160, "jpg", "JPEG_TN");
     }
 
     private void AddImageResElement(
-        BaseItem item,
+        ImageDownloadInfo imageInfo,
         XmlWriter writer,
         int maxWidth,
         int maxHeight,
@@ -1308,13 +1350,6 @@ public class DidlBuilder
         string org_Pn
     )
     {
-        var imageInfo = GetImageInfo(item);
-
-        if (imageInfo is null)
-        {
-            return;
-        }
-
         var albumartUrlInfo = GetImageUrl(imageInfo, maxWidth, maxHeight, format);
 
         writer.WriteStartElement(string.Empty, "res", NsDidl);
@@ -1475,10 +1510,15 @@ public class DidlBuilder
     /// <param name="item">The <see cref="BaseItem"/>.</param>
     /// <param name="stubType">Current <see cref="StubType"/>.</param>
     /// <param name="idSuffix">The optional virtual-folder ID suffix.</param>
+    /// <param name="ancestorId">The optional library scope encoded after the item id.</param>
     /// <returns>The client id</returns>
-    public static string GetClientId(BaseItem item, StubType? stubType, string? idSuffix = null)
+    public static string GetClientId(
+        BaseItem item,
+        StubType? stubType,
+        string? idSuffix = null,
+        Guid? ancestorId = null)
     {
-        return GetClientId(item.Id, stubType, idSuffix);
+        return GetClientId(item.Id, stubType, idSuffix, ancestorId);
     }
 
     /// <summary>
@@ -1487,8 +1527,13 @@ public class DidlBuilder
     /// <param name="idValue">The <see cref="Guid"/>.</param>
     /// <param name="stubType">Current <see cref="StubType"/>.</param>
     /// <param name="idSuffix">The optional virtual-folder ID suffix.</param>
+    /// <param name="ancestorId">The optional library scope encoded after the item id.</param>
     /// <returns>The client id</returns>
-    public static string GetClientId(Guid idValue, StubType? stubType, string? idSuffix = null)
+    public static string GetClientId(
+        Guid idValue,
+        StubType? stubType,
+        string? idSuffix = null,
+        Guid? ancestorId = null)
     {
         var id = idValue.ToString("N", CultureInfo.InvariantCulture);
 
@@ -1503,6 +1548,11 @@ public class DidlBuilder
                 )
                 + "_"
                 + id;
+        }
+
+        if (ancestorId.HasValue)
+        {
+            id += "_" + ancestorId.Value.ToString("N", CultureInfo.InvariantCulture);
         }
 
         return id;

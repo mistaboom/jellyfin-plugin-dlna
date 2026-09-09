@@ -108,5 +108,30 @@ public enum StubType
     /// <summary>
     /// Alphabetical series bucket stub.
     /// </summary>
-    SeriesLetter = 21
+    SeriesLetter = 21,
+
+    /// <summary>
+    /// Fleet video-library All view.
+    /// </summary>
+    All = 22,
+
+    /// <summary>
+    /// Fleet video-library Latest view.
+    /// </summary>
+    VideoLatest = 23,
+
+    /// <summary>
+    /// Fleet video-library genre index.
+    /// </summary>
+    VideoGenres = 24,
+
+    /// <summary>
+    /// Fleet movie genre folder.
+    /// </summary>
+    MovieGenre = 25,
+
+    /// <summary>
+    /// Fleet series genre folder.
+    /// </summary>
+    SeriesGenre = 26
 }

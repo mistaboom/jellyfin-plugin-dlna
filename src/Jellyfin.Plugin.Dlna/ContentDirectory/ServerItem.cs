@@ -1,3 +1,4 @@
+using System;
 using MediaBrowser.Controller.Entities;
 
 namespace Jellyfin.Plugin.Dlna.ContentDirectory;
@@ -14,11 +15,18 @@ internal sealed class ServerItem
     /// <param name="stubType">The virtual folder type.</param>
     /// <param name="virtualFolderName">The displayed name of the virtual folder.</param>
     /// <param name="idSuffix">The optional suffix encoded in the DLNA object ID.</param>
-    public ServerItem(BaseItem item, StubType? stubType, string? virtualFolderName = null, string? idSuffix = null)
+    /// <param name="ancestorId">The library the client browsed in from, for globally shared named items such as genres.</param>
+    public ServerItem(
+        BaseItem item,
+        StubType? stubType,
+        string? virtualFolderName = null,
+        string? idSuffix = null,
+        Guid? ancestorId = null)
     {
         Item = item;
         VirtualFolderName = virtualFolderName;
         IdSuffix = idSuffix;
+        AncestorId = ancestorId;
 
         if (stubType.HasValue)
         {
@@ -49,4 +57,9 @@ internal sealed class ServerItem
     /// Gets the suffix appended to the virtual folder object id.
     /// </summary>
     public string? IdSuffix { get; }
+
+    /// <summary>
+    /// Gets the library the client browsed in from, for globally shared named items such as genres.
+    /// </summary>
+    public Guid? AncestorId { get; }
 }
