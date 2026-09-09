@@ -1,0 +1,20 @@
+﻿[
+  {
+    "guid": "17f31d5c-4f2e-4824-903b-759d481b711a",
+    "name": "Fleet DLNA",
+    "description": "Fleet-focused DLNA server for Jellyfin with fast browsing, Latest and Genres views, and profile-driven transcoding.",
+    "overview": "Optimized DLNA for Samsung and LG television fleets.",
+    "owner": "mistaboom",
+    "category": "General",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Initial Fleet DLNA release with fast alphabetical browsing, Latest, Genres, and Samsung/LG optimizations.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/mistaboom/jellyfin-plugin-dlna/releases/download/v1.0.0.0/FleetDlna_1.0.0.0.zip",
+        "checksum": "44011449f8e571d1bcb1d914505cff99",
+        "timestamp": "2026-09-09T21:13:33Z"
+      }
+    ]
+  }
+]
