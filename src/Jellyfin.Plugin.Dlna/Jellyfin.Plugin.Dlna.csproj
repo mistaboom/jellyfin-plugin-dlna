@@ -5,6 +5,7 @@
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <Nullable>enable</Nullable>
         <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+        <AssemblyName>Jellyfin.Plugin.FleetDlna</AssemblyName>
     </PropertyGroup>
 
     <ItemGroup>

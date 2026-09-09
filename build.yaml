@@ -1,19 +1,25 @@
-name: "DLNA"
-guid: "33EBA9CD-7DA1-4720-967F-DD7DAE7B74A1"
-imageUrl: ""
-version: 11
-targetAbi: "10.11.9.0"
+---
+name: "Fleet DLNA"
+guid: "17F31D5C-4F2E-4824-903B-759D481B711A"
+version: 1
+targetAbi: "10.11.0.0"
 framework: "net9.0"
-owner: "jellyfin"
-overview: "DLNA Service"
+owner: "mistaboom"
+overview: "Fleet-optimized DLNA service"
 description: >
-  Adds DLNA capability to Jellyfin
-
+  DLNA service optimized for Samsung and LG television fleets,
+  with fast alphabetical browsing, Latest and Genres views,
+  and Jellyfin profile-driven transcoding.
 category: "General"
 artifacts:
-  - "Jellyfin.Plugin.Dlna.dll"
-  - "Jellyfin.Plugin.Dlna.Model.dll"
-  - "Jellyfin.Plugin.Dlna.Playback.dll"
-  - "Rssdp.dll"
+  - "Jellyfin.Plugin.FleetDlna.dll"
+  - "Jellyfin.Plugin.FleetDlna.Model.dll"
+  - "Jellyfin.Plugin.FleetDlna.Playback.dll"
+  - "FleetDlna.Rssdp.dll"
 changelog: |-
-  - Fix IUserManager.Users -> GetUsers() for Jellyfin 10.11.9 (#209) @crobibero
+  - Initial Fleet DLNA release.
+  - Fast All > Letter navigation.
+  - Latest folders for Movies and TV Shows.
+  - Functional library-scoped genre folders.
+  - Optimized DLNA browsing for Samsung and LG TVs.
+  - Preserves Jellyfin direct play, remuxing, and hardware transcoding.
